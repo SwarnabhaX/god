@@ -5,148 +5,117 @@ const brightnessValueDisplay = document.getElementById('brightnessValue');
 
 // Initialize UI from storage
 document.addEventListener('DOMContentLoaded', () => {
-  // Load dark mode state
+  console.log("Popup DOMContentLoaded: Loading settings and applying to page.");
   chrome.storage.sync.get(['darkModeEnabled', 'brightnessLevel'], (result) => {
     if (chrome.runtime.lastError) {
-      console.error('Error retrieving settings:', chrome.runtime.lastError);
-      // Set default values if error or no settings found
+      console.error('Popup: Error retrieving settings during init:', chrome.runtime.lastError.message);
       darkModeToggle.checked = false;
       brightnessSlider.value = 100;
       brightnessValueDisplay.textContent = '100';
-      // Optionally save these defaults
+      // Optionally save these defaults if not already set
       chrome.storage.sync.set({ darkModeEnabled: false, brightnessLevel: 100 });
+      // Even on error, try to apply defaults to the page
+      applySettingsToPage(false, 100, "initErrorFallback");
     } else {
-      darkModeToggle.checked = !!result.darkModeEnabled; // Ensure boolean
-      brightnessSlider.value = result.brightnessLevel === undefined ? 100 : result.brightnessLevel;
-      brightnessValueDisplay.textContent = brightnessSlider.value;
+      const enabled = !!result.darkModeEnabled;
+      const level = result.brightnessLevel === undefined ? 100 : result.brightnessLevel;
+      darkModeToggle.checked = enabled;
+      brightnessSlider.value = level;
+      brightnessValueDisplay.textContent = level;
+      console.log('Popup: Settings loaded:', { enabled, level });
+      applySettingsToPage(enabled, level, "initSuccess");
     }
-    // Initial application of settings to the page when popup opens
-    // This is important if the content script was not active or lost state
-    applySettingsToPage(darkModeToggle.checked, parseInt(brightnessSlider.value, 10));
   });
 });
 
 // Dark mode toggle event listener
 darkModeToggle.addEventListener('change', () => {
   const enabled = darkModeToggle.checked;
+  console.log(`Popup: Dark mode toggled to ${enabled}. Saving and applying.`);
   chrome.storage.sync.set({ darkModeEnabled: enabled }, () => {
     if (chrome.runtime.lastError) {
-      console.error('Error saving dark mode state:', chrome.runtime.lastError);
+      console.error('Popup: Error saving dark mode state:', chrome.runtime.lastError.message);
     } else {
-      console.log('Dark mode state saved:', enabled);
-      applySettingsToPage(enabled, parseInt(brightnessSlider.value, 10));
+      console.log('Popup: Dark mode state saved successfully.');
+      applySettingsToPage(enabled, parseInt(brightnessSlider.value, 10), "darkModeToggle");
     }
   });
 });
 
-// Brightness slider event listener
+// Brightness slider 'input' event for live value display
 brightnessSlider.addEventListener('input', () => {
-  const level = parseInt(brightnessSlider.value, 10);
-  brightnessValueDisplay.textContent = level;
-  // Debounce or use 'change' event if performance is an issue for frequent updates
+  brightnessValueDisplay.textContent = brightnessSlider.value;
 });
 
-brightnessSlider.addEventListener('change', () => { // Saves when user releases slider
-    const level = parseInt(brightnessSlider.value, 10);
-    chrome.storage.sync.set({ brightnessLevel: level }, () => {
-        if (chrome.runtime.lastError) {
-            console.error('Error saving brightness level:', chrome.runtime.lastError);
-        } else {
-            console.log('Brightness level saved:', level);
-            applySettingsToPage(darkModeToggle.checked, level);
-        }
-    });
+// Brightness slider 'change' event for saving and applying
+brightnessSlider.addEventListener('change', () => {
+  const level = parseInt(brightnessSlider.value, 10);
+  console.log(`Popup: Brightness changed to ${level}. Saving and applying.`);
+  chrome.storage.sync.set({ brightnessLevel: level }, () => {
+    if (chrome.runtime.lastError) {
+      console.error('Popup: Error saving brightness level:', chrome.runtime.lastError.message);
+    } else {
+      console.log('Popup: Brightness level saved successfully.');
+      applySettingsToPage(darkModeToggle.checked, level, "brightnessChange");
+    }
+  });
 });
 
 // Function to send settings to the content script
-function applySettingsToPage(darkModeEnabled, brightnessLevel) {
+function applySettingsToPage(darkModeEnabled, brightnessLevel, source = "Unknown") {
+  console.log(`Popup: applySettingsToPage called from ${source}. DarkMode: ${darkModeEnabled}, Brightness: ${brightnessLevel}`);
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs.length === 0) {
-        console.log("No active tab found to apply settings.");
-        return;
+    if (chrome.runtime.lastError) {
+      console.error("Popup: Error querying tabs:", chrome.runtime.lastError.message);
+      return;
     }
-    const activeTab = tabs[0];
-    if (activeTab.id === undefined) {
-        console.log("Active tab has no ID, cannot send message.");
-        return;
+    if (!tabs || tabs.length === 0 || !tabs[0].id) {
+      console.warn("Popup: No active tab found or active tab has no ID. Cannot send settings.");
+      return;
     }
+    const activeTabId = tabs[0].id;
+    const activeTabUrl = tabs[0].url;
 
-    // Check if the URL is a chrome:// URL, which content scripts cannot access
-    if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://'))) {
-        console.log(`Cannot apply settings to Chrome internal page: ${activeTab.url}`);
-        // Optionally disable controls or show a message in the popup
-        darkModeToggle.disabled = true;
-        brightnessSlider.disabled = true;
-        // Update popup to inform user
-        const statusMessage = document.createElement('p');
-        statusMessage.textContent = 'Extension cannot modify this page.';
-        statusMessage.style.color = 'red';
-        statusMessage.style.textAlign = 'center';
-        // Clear previous messages
-        const existingMessage = document.getElementById('statusMessage');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
+    // Check for restricted URLs where content scripts might not run
+    if (activeTabUrl && (activeTabUrl.startsWith('chrome://') || activeTabUrl.startsWith('edge://') || activeTabUrl.startsWith('https://chrome.google.com/webstore'))) {
+      console.warn(`Popup: Cannot apply settings to restricted page: ${activeTabUrl}.`);
+      darkModeToggle.disabled = true;
+      brightnessSlider.disabled = true;
+      let statusMessage = document.getElementById('statusMessage');
+      if (!statusMessage) {
+        statusMessage = document.createElement('p');
         statusMessage.id = 'statusMessage';
+        statusMessage.style.color = 'orange';
+        statusMessage.style.textAlign = 'center';
         document.body.appendChild(statusMessage);
-        return;
+      }
+      statusMessage.textContent = 'Extension cannot modify this page.';
+      return;
     } else {
-         // Re-enable controls if previously disabled
-        darkModeToggle.disabled = false;
-        brightnessSlider.disabled = false;
-        const existingMessage = document.getElementById('statusMessage');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
+      darkModeToggle.disabled = false;
+      brightnessSlider.disabled = false;
+      const existingMessage = document.getElementById('statusMessage');
+      if (existingMessage) {
+        existingMessage.remove();
+      }
     }
 
-
-    chrome.scripting.executeScript({
-      target: { tabId: activeTab.id },
-      func: (isDarkMode, brightness) => {
-        // This function will be executed in the content script's context (or a similar isolated world)
-        // It does NOT have access to the content.js's scope directly.
-        // We need to use messages or rely on content.js to already be there.
-        // For simplicity, let's assume content.js is loaded and listening.
-        // The best way is to send a message.
-        chrome.runtime.sendMessage({
-          type: 'APPLY_SETTINGS',
-          darkMode: isDarkMode,
-          brightness: brightness
-        });
-
-        // Fallback or direct manipulation if content script messaging is tricky:
-        // This is less ideal as it duplicates logic and might not have access to content.js functions.
-        // For direct manipulation (example, not recommended for complex scripts):
-        // if (isDarkMode) {
-        //   document.documentElement.setAttribute('data-theme', 'dark');
-        // } else {
-        //   document.documentElement.removeAttribute('data-theme');
-        // }
-        // document.documentElement.style.filter = `brightness(${brightness}%)`;
-      },
-      args: [darkModeEnabled, brightnessLevel]
-    }, () => {
-        if (chrome.runtime.lastError) {
-            console.error("Error executing script:", chrome.runtime.lastError.message);
-        } else {
-            console.log("Settings applied via executeScript to tab:", activeTab.id);
-        }
-    });
-
-    // Send message to content script (preferred way if content.js has listeners)
-    chrome.tabs.sendMessage(activeTab.id, {
-        type: 'APPLY_SETTINGS',
-        darkMode: darkModeEnabled,
-        brightness: brightnessLevel
+    console.log(`Popup: Sending APPLY_SETTINGS to tab ${activeTabId}. DarkMode: ${darkModeEnabled}, Brightness: ${brightnessLevel}`);
+    chrome.tabs.sendMessage(activeTabId, {
+      type: 'APPLY_SETTINGS',
+      darkMode: darkModeEnabled,
+      brightness: brightnessLevel
     }, response => {
-        if (chrome.runtime.lastError) {
-            console.warn("Error sending message to content script, or content script not ready:", chrome.runtime.lastError.message);
-            // This can happen if the content script hasn't loaded yet,
-            // or if the page is a type that doesn't allow content scripts (e.g., new tab page, chrome web store)
+      if (chrome.runtime.lastError) {
+        console.warn(`Popup: Error sending message to content script for tab ${activeTabId}. Error: ${chrome.runtime.lastError.message}. This can happen if the content script is not injected or the tab is closed.`);
+      } else {
+        if (response && response.status) {
+          console.log(`Popup: Message sent to content script for tab ${activeTabId}. Response: ${response.status}`);
         } else {
-            console.log("Message sent to content script and received response:", response);
+          // This case can happen if the content script does not send a response or an unexpected response format.
+          console.warn(`Popup: Message sent to content script for tab ${activeTabId}, but no/invalid response status received. This may or may not be an issue.`);
         }
+      }
     });
   });
 }

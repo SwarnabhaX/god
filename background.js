@@ -49,31 +49,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // This helps ensure styles are applied on navigations within SPAs or if content script injection is delayed.
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Check if the tab has finished loading and has a URL (to avoid acting on empty new tabs etc.)
-  if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
-    console.log(`Tab ${tabId} updated and completed: ${tab.url}. Re-evaluating settings.`);
+  if (changeInfo.status === 'complete' &&
+      tab.url &&
+      !tab.url.startsWith('chrome://') &&
+      !tab.url.startsWith('edge://') &&
+      !tab.url.startsWith('about:') &&
+      !tab.url.startsWith('https://chrome.google.com/webstore')) {
+
+    console.log(`Background: Tab ${tabId} updated and completed: ${tab.url}. Re-evaluating settings.`);
     chrome.storage.sync.get(['darkModeEnabled', 'brightnessLevel'], (result) => {
       if (chrome.runtime.lastError) {
-        console.error('Error retrieving settings for tab update:', chrome.runtime.lastError.message);
+        console.error('Background: Error retrieving settings for tab update:', chrome.runtime.lastError.message);
         return;
       }
 
       const darkModeEnabled = !!result.darkModeEnabled;
       const brightnessLevel = result.brightnessLevel === undefined ? 100 : result.brightnessLevel;
 
-      // Send message to the content script of the updated tab
-      // Using sendMessage is generally preferred over executeScript for re-applying,
-      // as the content script has the functions already defined.
+      console.log(`Background: Sending APPLY_SETTINGS to tab ${tabId}. DarkMode: ${darkModeEnabled}, Brightness: ${brightnessLevel}`);
       chrome.tabs.sendMessage(tabId, {
         type: 'APPLY_SETTINGS',
         darkMode: darkModeEnabled,
         brightness: brightnessLevel
       }, response => {
         if (chrome.runtime.lastError) {
-          // This error is common if the content script isn't injected on that specific page (e.g., chrome web store)
-          // or if the tab was closed before the message was processed.
-          console.warn(`Could not send APPLY_SETTINGS to tab ${tabId} (might be a restricted page or content script not ready): ${chrome.runtime.lastError.message}`);
+          console.warn(`Background: Could not send APPLY_SETTINGS to tab ${tabId} (might be a restricted page or content script not ready): ${chrome.runtime.lastError.message}`);
         } else {
-          console.log(`Settings re-applied to tab ${tabId} after update. Response:`, response);
+          if (response && response.status) {
+            console.log(`Background: Settings re-applied to tab ${tabId} after update. Response: ${response.status}`);
+          } else {
+            console.warn(`Background: Settings re-applied to tab ${tabId} after update, but no/invalid response status received.`);
+          }
         }
       });
     });

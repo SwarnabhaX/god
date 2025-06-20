@@ -4,83 +4,150 @@
   <title>Dark Mode & Brightness</title>
   <style>
     body {
-      font-family: sans-serif;
-      width: 250px;
-      padding: 10px;
-      background-color: #f4f4f4;
-      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      width: 280px; /* Slightly wider for better spacing */
+      padding: 18px;
+      background-color: #282c34; /* Dark background */
+      color: #abb2bf; /* Light grey text */
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 18px; /* Space between control groups */
     }
     h3 {
-      margin-top: 0;
-      color: #555;
+      margin: 0 0 10px 0;
+      color: #61afef; /* Accent color for heading */
       text-align: center;
+      font-size: 18px;
+      font-weight: 600;
     }
     .control-group {
-      margin-bottom: 15px;
-      padding: 10px;
-      background-color: #fff;
-      border-radius: 5px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      background-color: #353a45; /* Slightly lighter dark for groups */
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
+      margin-bottom: 8px;
+      font-weight: 500;
+      font-size: 14px;
     }
-    input[type="range"] {
-      width: 100%;
-      cursor: pointer;
+    .toggle-switch-label { /* Specific class for the Dark Mode label text */
+        color: #abb2bf; /* Ensure it's light */
     }
+
+    /* Toggle Switch Styles */
     .toggle-switch {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    /* Basic styling for the toggle switch */
     .switch {
       position: relative;
       display: inline-block;
-      width: 50px;
-      height: 24px;
+      width: 44px; /* Slightly smaller */
+      height: 22px;
     }
     .switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
-    .slider {
+    .slider-round { /* Changed class name for clarity */
       position: absolute;
       cursor: pointer;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 24px;
+      background-color: #4b5260; /* Darker grey for off state */
+      transition: .3s;
+      border-radius: 22px;
     }
-    .slider:before {
+    .slider-round:before {
       position: absolute;
       content: "";
       height: 16px;
       width: 16px;
-      left: 4px;
-      bottom: 4px;
+      left: 3px; /* Adjusted for new size */
+      bottom: 3px; /* Adjusted for new size */
       background-color: white;
-      transition: .4s;
+      transition: .3s;
       border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
-    input:checked + .slider {
-      background-color: #2196F3;
+    input:checked + .slider-round {
+      background-color: #61afef; /* Accent color for on state */
     }
-    input:checked + .slider:before {
-      transform: translateX(26px);
+    input:checked + .slider-round:before {
+      transform: translateX(22px); /* Adjusted for new size */
     }
+
+    /* Range Slider Styles */
     #brightnessValue {
       display: inline-block;
-      min-width: 25px;
+      min-width: 30px;
       text-align: right;
-      font-weight: bold;
+      font-weight: 500;
+      color: #61afef; /* Accent color */
+    }
+    input[type="range"] {
+      width: 100%;
+      cursor: pointer;
+      -webkit-appearance: none; /* Override default appearance */
+      appearance: none;
+      background: transparent; /* Transparent track */
+      height: 20px; /* Overall height for interaction */
+      margin-top: 5px;
+    }
+
+    /* Range Slider Track (Chrome/Safari/Edge) */
+    input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: #4b5260; /* Dark track */
+      border-radius: 3px;
+    }
+    /* Range Slider Thumb (Chrome/Safari/Edge) */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -7px; /* Center thumb on track ( (track_height - thumb_height)/2 + border_width ) */
+      width: 20px;
+      height: 20px;
+      background: #61afef; /* Accent color thumb */
+      border-radius: 50%;
+      border: 2px solid #282c34; /* Border matches body bg for "floating" look */
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* Range Slider Track (Firefox) */
+    input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: #4b5260;
+      border-radius: 3px;
+      border: none;
+    }
+    /* Range Slider Thumb (Firefox) */
+    input[type="range"]::-moz-range-thumb {
+      width: 18px; /* Slightly smaller to match webkit visual */
+      height: 18px;
+      background: #61afef;
+      border-radius: 50%;
+      border: 2px solid #282c34;
+      cursor: pointer;
+    }
+
+    /* Status message styling (from popup.js) */
+    #statusMessage {
+        font-size: 12px;
+        padding: 10px;
+        background-color: #4b5260;
+        border-radius: 5px;
+        margin-top: 10px;
+        text-align: center;
     }
   </style>
 </head>
@@ -89,10 +156,10 @@
 
   <div class="control-group">
     <div class="toggle-switch">
-      <label for="darkModeToggle">Dark Mode</label>
+      <label for="darkModeToggle" class="toggle-switch-label">Dark Mode</label> <!-- Added class here -->
       <label class="switch">
         <input type="checkbox" id="darkModeToggle">
-        <span class="slider"></span>
+        <span class="slider-round"></span> <!-- Changed class here -->
       </label>
     </div>
   </div>
