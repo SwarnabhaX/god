@@ -1,0 +1,125 @@
+/* Global dark mode styles when the specific class is applied to html element */
+html.__dark-mode-activated__ {
+  background-color: #1e1e1e !important; /* Dark background for the entire page */
+  color: #e0e0e0 !important; /* Light text color */
+}
+
+/* Basic inversion for most elements */
+/* We need to be careful not to apply this too broadly or on elements that handle their own dark mode */
+html.__dark-mode-activated__ body *:not(img):not(video):not(iframe):not(svg):not(canvas):not([style*="background-image"]):not([class*="icon"]):not(button):not(input):not(select):not(textarea) {
+  background-color: inherit !important; /* Inherit from html or parent */
+  color: inherit !important; /* Inherit from html or parent */
+  border-color: #555 !important; /* Darker borders */
+}
+
+/* Specifically target text elements if the above is too broad */
+html.__dark-mode-activated__ p,
+html.__dark-mode-activated__ span,
+html.__dark-mode-activated__ div,
+html.__dark-mode-activated__ li,
+html.__dark-mode-activated__ th,
+html.__dark-mode-activated__ td,
+html.__dark-mode-activated__ article,
+html.__dark-mode-activated__ section,
+html.__dark-mode-activated__ header,
+html.__dark-mode-activated__ footer,
+html.__dark-mode-activated__ nav,
+html.__dark-mode-activated__ aside {
+  /* If elements have their own background, try to make it dark */
+  /* This is tricky; simple inversion is often better if applied carefully */
+}
+
+
+/* Links */
+html.__dark-mode-activated__ a {
+  color: #87cefa !important; /* Light blue for links */
+}
+html.__dark-mode-activated__ a:visited {
+  color: #ba87fa !important; /* A slightly different color for visited links */
+}
+
+/* Buttons and Form Elements - try to give them a dark theme appearance */
+html.__dark-mode-activated__ button,
+html.__dark-mode-activated__ input,
+html.__dark-mode-activated__ select,
+html.__dark-mode-activated__ textarea,
+html.__dark-mode-activated__ .button { /* Common class for button-like elements */
+  background-color: #333333 !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #555555 !important;
+}
+html.__dark-mode-activated__ input[type="checkbox"],
+html.__dark-mode-activated__ input[type="radio"] {
+  /* Basic filter to make them appear dark-themed, might need more specific styling */
+  filter: invert(100%) hue-rotate(180deg) contrast(70%);
+}
+html.__dark-mode-activated__ ::placeholder {
+  color: #aaa !important;
+}
+
+
+/* Code blocks and preformatted text */
+html.__dark-mode-activated__ pre,
+html.__dark-mode-activated__ code {
+  background-color: #2a2a2a !important;
+  color: #c0c0c0 !important;
+  border: 1px solid #444 !important;
+}
+
+/* Exclude media and other sensitive elements from color inversion if a global invert was used.
+   If not using a global invert, these rules might not be necessary or could be different.
+   The current approach avoids global inversion on body, preferring specific overrides.
+*/
+html.__dark-mode-activated__ img,
+html.__dark-mode-activated__ video,
+html.__dark-mode-activated__ iframe,
+html.__dark-mode-activated__ svg,
+html.__dark-mode-activated__ canvas,
+html.__dark-mode-activated__ [style*="background-image"] {
+  /*
+    If images/videos look inverted, this is a common fix:
+    filter: invert(1) hue-rotate(180deg);
+    However, this can have side effects on colors.
+    It's often better to prevent inversion in the first place.
+    The current content.js applies brightness to the whole page,
+    so images will be affected by that, but not by this CSS's color changes directly unless they inherit.
+  */
+   /* No specific rules here yet, relying on them not inheriting inverted colors */
+}
+
+
+/* Custom scrollbar styling (WebKit/Blink browsers) */
+html.__dark-mode-activated__ ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+html.__dark-mode-activated__ ::-webkit-scrollbar-track {
+  background: #2c2c2c;
+}
+html.__dark-mode-activated__ ::-webkit-scrollbar-thumb {
+  background-color: #555;
+  border-radius: 6px;
+  border: 3px solid #2c2c2c;
+}
+html.__dark-mode-activated__ ::-webkit-scrollbar-thumb:hover {
+  background-color: #777;
+}
+
+/* Add any site-specific overrides or more detailed element styling below */
+
+/* Example of a more aggressive inversion for elements that are not images/videos etc.
+   This would be an alternative to the body *:not(...) selector if that's not specific enough.
+html.__dark-mode-activated__ *:not(img):not(video):not(svg):not(canvas):not(embed):not(object):not(picture):not(iframe) {
+    filter: invert(100%) hue-rotate(180deg) !important;
+    background-color: #121212 !important;
+}
+html.__dark-mode-activated__ img,
+html.__dark-mode-activated__ video,
+html.__dark-mode-activated__ svg,
+html.__dark-mode-activated__ canvas,
+html.__dark-mode-activated__ embed,
+html.__dark-mode-activated__ object,
+html.__dark-mode-activated__ picture {
+    filter: invert(100%) hue-rotate(180deg) !important; // Re-invert media if parent was inverted
+}
+*/
