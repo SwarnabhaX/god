@@ -89,7 +89,34 @@ function handleAlarm(alarm) {
 
             if (triggeredSchedule) {
                 console.log(`Background: Found schedule for alarm: ID=${scheduleId}, Time=${triggeredSchedule.time}, Brightness=${triggeredSchedule.brightness}%. Applying now. Current DM state: ${currentDarkMode}`);
+
+                // Update brightnessLevel in storage to reflect the scheduled change
+                chrome.storage.sync.set({ brightnessLevel: triggeredSchedule.brightness }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error(`Background: Error saving scheduled brightness ${triggeredSchedule.brightness}% to storage:`, chrome.runtime.lastError.message);
+                    } else {
+                        console.log(`Background: Successfully saved scheduled brightness ${triggeredSchedule.brightness}% to storage.`);
+                    }
+                });
+
                 applyScheduledBrightnessToTabs(currentDarkMode, triggeredSchedule.brightness, `schedule_${triggeredSchedule.time}`);
+
+                // --- START: New logic to remove executed schedule ---
+                const remainingSchedules = schedules.filter(s => s.id !== scheduleId);
+                chrome.storage.sync.set({ brightnessSchedules: remainingSchedules }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error(`Background: Error removing schedule ${scheduleId} from storage:`, chrome.runtime.lastError.message);
+                    } else {
+                        console.log(`Background: Successfully removed schedule ${scheduleId} from storage. Remaining schedules: ${remainingSchedules.length}`);
+                        // No need to call initializeAlarms() here, as storage.onChanged will pick it up if needed,
+                        // or if not, then the alarm for this schedule is gone and others remain.
+                        // However, if removing a schedule should re-evaluate other alarms (e.g. if there was complex inter-dependency, not the case here),
+                        // then a call to initializeAlarms() might be considered. For one-time daily alarms, it's fine.
+                        // The specific alarm for this schedule is now gone and won't fire again.
+                    }
+                });
+                // --- END: New logic to remove executed schedule ---
+
             } else {
                 console.warn(`Background: Triggered schedule ID '${scheduleId}' not found in current schedules. Alarm name: ${alarm.name}`);
             }
@@ -138,7 +165,7 @@ async function initializeAlarms() {
             }
 
             const alarmName = `${ALARM_PREFIX}${schedule.id}`;
-            const alarmInfo = { when: nextRun.getTime(), periodInMinutes: 24 * 60 };
+            const alarmInfo = { when: nextRun.getTime() }; // Make alarm non-repeating
 
             console.log(`Background: Preparing to create alarm: Name='${alarmName}', ID=${schedule.id}, Time=${schedule.time}, Calculated 'when'=${new Date(alarmInfo.when).toLocaleString()}`);
 
