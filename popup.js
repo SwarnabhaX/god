@@ -82,22 +82,93 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applySettingsToPage(darkModeEnabled, brightnessLevel, source = "Unknown") {
-        console.log(`Popup: applySettingsToPage from ${source}. DM: ${darkModeEnabled}, B: ${brightnessLevel}`);
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (chrome.runtime.lastError || !tabs || tabs.length === 0 || !tabs[0].id) {
-                console.warn("Popup: No active tab or error querying. Cannot send settings.", chrome.runtime.lastError?.message);
+        console.log(`Popup: applySettingsToPage from ${source}. DM: ${darkModeEnabled}, B: ${brightnessLevel}. Applying to ALL relevant tabs.`);
+
+        // Query for all tabs in all windows
+        chrome.tabs.query({}, (tabs) => {
+            if (chrome.runtime.lastError) {
+                console.error("Popup: Error querying all tabs:", chrome.runtime.lastError.message);
                 return;
             }
-            const activeTab = tabs[0];
-            if (activeTab.url && (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('edge://') || activeTab.url.startsWith('https://chrome.google.com/webstore'))) {
-                console.warn(`Popup: Cannot apply settings to restricted page: ${activeTab.url}.`);
-                // UI disable logic handled by renderSchedulesUI or similar if needed for global disable
+            if (!tabs || tabs.length === 0) {
+                console.warn("Popup: No tabs found. Cannot send settings.");
                 return;
             }
-            chrome.tabs.sendMessage(activeTab.id, { type: 'APPLY_SETTINGS', darkMode: darkModeEnabled, brightness: brightnessLevel }, response => {
-                if (chrome.runtime.lastError) console.warn(`Popup: Error sending message to tab ${activeTab.id}:`, chrome.runtime.lastError.message);
-                else console.log(`Popup: Message sent to tab ${activeTab.id}. Response:`, response?.status);
-            });
+
+            let activeTabRestricted = false;
+
+            for (const tab of tabs) {
+                if (!tab.id) {
+                    console.warn(`Popup: Tab ID missing for a tab, skipping. URL: ${tab.url || 'N/A'}`);
+                    continue;
+                }
+
+                const tabUrl = tab.url;
+                const isRestricted = tabUrl && (tabUrl.startsWith('chrome://') || tabUrl.startsWith('edge://') || tabUrl.startsWith('https://chrome.google.com/webstore'));
+
+                if (tab.active && tabs.find(t => t.windowId === chrome.windows.WINDOW_ID_CURRENT && t.id === tab.id)) { // Check if it's the active tab in current window
+                    if (isRestricted) {
+                        activeTabRestricted = true;
+                        console.warn(`Popup: Active tab is a restricted page: ${tabUrl}. UI controls will be disabled.`);
+                    }
+                }
+
+                if (isRestricted) {
+                    // console.log(`Popup: Skipping restricted page: ${tabUrl} (Tab ID: ${tab.id})`);
+                    continue; // Skip sending message to restricted pages
+                }
+
+                // console.log(`Popup: Sending APPLY_SETTINGS to tab ${tab.id} (${tabUrl || 'N/A'}). DM: ${darkModeEnabled}, B: ${brightnessLevel}`);
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'APPLY_SETTINGS',
+                    darkMode: darkModeEnabled,
+                    brightness: brightnessLevel
+                }, response => {
+                    if (chrome.runtime.lastError) {
+                        // This warning is common for tabs that don't have the content script (e.g., special browser pages, closed tabs)
+                        // console.warn(`Popup: Error sending message to tab ${tab.id}. Error: ${chrome.runtime.lastError.message}.`);
+                    } else {
+                        // console.log(`Popup: Message sent to tab ${tab.id}. Response: ${response?.status}`);
+                    }
+                });
+            }
+
+            // Update UI controls based on whether the *actually active* tab (where popup was opened) is restricted
+            const currentWindowActiveTab = tabs.find(t => t.active && t.windowId === chrome.windows.WINDOW_ID_CURRENT);
+            const isCurrentActiveTabRestricted = currentWindowActiveTab && currentWindowActiveTab.url &&
+                                               (currentWindowActiveTab.url.startsWith('chrome://') ||
+                                                currentWindowActiveTab.url.startsWith('edge://') ||
+                                                currentWindowActiveTab.url.startsWith('https://chrome.google.com/webstore'));
+
+            if (isCurrentActiveTabRestricted) {
+                // This query is just to ensure we have the active tab of the *current window*
+                // The main loop already iterated over it, this is for UI update.
+                console.warn(`Popup: Active tab in current window is restricted. Disabling controls.`);
+                darkModeToggle.disabled = true;
+                brightnessSlider.disabled = true;
+                let statusMessage = document.getElementById('statusMessage');
+                if (!statusMessage) {
+                    statusMessage = document.createElement('p');
+                    statusMessage.id = 'statusMessage';
+                    statusMessage.style.color = 'orange'; // Using existing style
+                    statusMessage.style.textAlign = 'center';
+                    // Insert after h3, or at a defined place
+                    const heading = document.querySelector('h3');
+                    if(heading && heading.parentNode) {
+                        heading.parentNode.insertBefore(statusMessage, heading.nextSibling);
+                    } else {
+                        document.body.appendChild(statusMessage);
+                    }
+                }
+                statusMessage.textContent = 'Extension cannot modify this page.';
+            } else {
+                darkModeToggle.disabled = false;
+                brightnessSlider.disabled = false;
+                const existingMessage = document.getElementById('statusMessage');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+            }
         });
     }
 

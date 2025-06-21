@@ -8,14 +8,16 @@ chrome.runtime.onStartup.addListener(handleStartup);
 chrome.storage.onChanged.addListener(handleStorageChange);
 chrome.alarms.onAlarm.addListener(handleAlarm);
 
-console.log('Background service worker started and listeners attached.');
-initializeAlarms(); // Initial setup of alarms when SW starts
+console.log('Background: Service worker started. Listeners attached.');
+// Call initializeAlarms after a brief delay to ensure storage is accessible,
+// especially on first install or after browser start.
+setTimeout(initializeAlarms, 1000);
+
 
 // --- Event Handler Functions ---
 
 function handleInstallation(details) {
-    console.log('Background: onInstalled event, reason:', details.reason);
-    // Initialize default settings
+    console.log('Background: onInstalled event. Reason:', details.reason);
     chrome.storage.sync.get(['darkModeEnabled', 'brightnessLevel', 'timeSchedulesEnabled', 'brightnessSchedules'], (result) => {
         const defaults = {};
         if (result.darkModeEnabled === undefined) defaults.darkModeEnabled = false;
@@ -25,15 +27,14 @@ function handleInstallation(details) {
 
         if (Object.keys(defaults).length > 0) {
             chrome.storage.sync.set(defaults, () => {
-                console.log('Background: Default settings initialized/ensured in storage.');
-                initializeAlarms(); // Initialize alarms after ensuring defaults
+                console.log('Background: Default settings initialized/ensured.');
+                initializeAlarms();
             });
         } else {
-            // If all settings already exist, still ensure alarms are set up
+            console.log('Background: All settings already exist.');
             initializeAlarms();
         }
     });
-
     if (details.reason === 'update') {
         console.log('Background: Extension updated to version', chrome.runtime.getManifest().version);
     }
@@ -46,80 +47,81 @@ function handleStartup() {
 
 function handleStorageChange(changes, areaName) {
     if (areaName === 'sync') {
-        let reinitialize = false;
+        let reinitializeScheduler = false;
         if (changes.timeSchedulesEnabled || changes.brightnessSchedules) {
-            console.log('Background: Time schedule settings changed, will re-initialize alarms.');
-            reinitialize = true;
+            console.log('Background: Storage changed for timeSchedulesEnabled or brightnessSchedules. Re-initializing alarms.');
+            reinitializeScheduler = true;
         }
 
-        if (reinitialize) {
+        if (reinitializeScheduler) {
             initializeAlarms();
         }
 
-        // Handle application of general dark mode/brightness if changed by another context (less common)
-        // This part is mostly for the tabs.onUpdated logic to pick up latest general settings
         if (changes.darkModeEnabled || changes.brightnessLevel) {
-             console.log('Background: darkModeEnabled or brightnessLevel changed. Future tab updates will use new values.');
+             console.log('Background: Storage changed for darkModeEnabled or brightnessLevel. Active tabs will use new values on next update/load.');
         }
     }
 }
 
 function handleAlarm(alarm) {
-    console.log('Background: Alarm triggered:', alarm.name);
+    console.log(`Background: Alarm '${alarm.name}' triggered at ${new Date().toLocaleTimeString()}`);
     if (alarm.name && alarm.name.startsWith(ALARM_PREFIX)) {
         const scheduleId = alarm.name.substring(ALARM_PREFIX.length);
         if (!scheduleId) {
-            console.warn('Background: Alarm triggered with no valid schedule ID:', alarm.name);
+            console.warn('Background: Alarm triggered with no valid schedule ID in name:', alarm.name);
             return;
         }
 
         chrome.storage.sync.get(['brightnessSchedules', 'darkModeEnabled', 'timeSchedulesEnabled'], (result) => {
             if (chrome.runtime.lastError) {
-                console.error('Background: Error getting storage for alarm:', chrome.runtime.lastError.message);
+                console.error('Background: Error getting storage for alarm handler:', chrome.runtime.lastError.message);
                 return;
             }
 
             if (!result.timeSchedulesEnabled) {
-                console.log('Background: Time schedules are disabled, ignoring alarm:', alarm.name);
+                console.log(`Background: Time schedules are currently disabled. Ignoring alarm: ${alarm.name}`);
                 return;
             }
 
             const schedules = Array.isArray(result.brightnessSchedules) ? result.brightnessSchedules : [];
             const triggeredSchedule = schedules.find(s => s.id === scheduleId);
-            const currentDarkMode = !!result.darkModeEnabled;
+            const currentDarkMode = !!result.darkModeEnabled; // Preserve user's manual dark mode setting
 
             if (triggeredSchedule) {
-                console.log(`Background: Applying scheduled brightness: ${triggeredSchedule.brightness}% for schedule ID ${scheduleId}. Current dark mode: ${currentDarkMode}`);
-                applyScheduledBrightnessToTabs(currentDarkMode, triggeredSchedule.brightness);
+                console.log(`Background: Found schedule for alarm: ID=${scheduleId}, Time=${triggeredSchedule.time}, Brightness=${triggeredSchedule.brightness}%. Applying now. Current DM state: ${currentDarkMode}`);
+                applyScheduledBrightnessToTabs(currentDarkMode, triggeredSchedule.brightness, `schedule_${triggeredSchedule.time}`);
             } else {
-                console.warn(`Background: Triggered schedule ID ${scheduleId} not found in storage.`);
+                console.warn(`Background: Triggered schedule ID '${scheduleId}' not found in current schedules. Alarm name: ${alarm.name}`);
             }
         });
+    } else {
+        console.log(`Background: Alarm '${alarm.name}' is not a brightness schedule alarm. Ignoring.`);
     }
 }
 
 // --- Alarm Management ---
 
 async function initializeAlarms() {
-    console.log('Background: Initializing alarms...');
+    console.log('Background: Starting initializeAlarms function.');
     try {
         const items = await chrome.storage.sync.get(['timeSchedulesEnabled', 'brightnessSchedules']);
         const enabled = !!items.timeSchedulesEnabled;
         const schedules = Array.isArray(items.brightnessSchedules) ? items.brightnessSchedules : [];
 
-        // Clear existing alarms first
+        console.log(`Background: Clearing existing alarms. Current state - Enabled: ${enabled}, Schedules count: ${schedules.length}`);
+
         const allAlarms = await chrome.alarms.getAll();
         let clearedCount = 0;
-        for (const alarm of allAlarms) {
-            if (alarm.name.startsWith(ALARM_PREFIX)) {
-                await chrome.alarms.clear(alarm.name);
+        for (const existingAlarm of allAlarms) {
+            if (existingAlarm.name.startsWith(ALARM_PREFIX)) {
+                await chrome.alarms.clear(existingAlarm.name);
                 clearedCount++;
             }
         }
         console.log(`Background: Cleared ${clearedCount} existing schedule alarms.`);
 
         if (!enabled || schedules.length === 0) {
-            console.log('Background: Time-based brightness is disabled or no schedules. No new alarms created.');
+            console.log('Background: Time-based brightness is disabled or no schedules. No new alarms will be created.');
             return;
         }
 
@@ -127,88 +129,109 @@ async function initializeAlarms() {
         for (const schedule of schedules) {
             const [hours, minutes] = schedule.time.split(':').map(Number);
 
-            // Calculate next occurrence
             let now = new Date();
-            let nextRun = new Date();
-            nextRun.setHours(hours, minutes, 0, 0); // Set to today's schedule time
+            let nextRun = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 
-            if (now.getTime() > nextRun.getTime()) { // If time has passed for today
-                nextRun.setDate(now.getDate() + 1); // Schedule for tomorrow
+            if (now.getTime() > nextRun.getTime()) {
+                nextRun.setDate(nextRun.getDate() + 1);
+                console.log(`Background: Schedule time ${schedule.time} has passed for today. Scheduling for tomorrow.`);
             }
-            // else: it's for today, later
 
             const alarmName = `${ALARM_PREFIX}${schedule.id}`;
-            chrome.alarms.create(alarmName, {
-                when: nextRun.getTime(),
-                periodInMinutes: 24 * 60 // Repeat daily
-            });
-            createdCount++;
-            console.log(`Background: Created alarm '${alarmName}' for schedule ID ${schedule.id} at ${nextRun.toLocaleString()}`);
+            const alarmInfo = { when: nextRun.getTime(), periodInMinutes: 24 * 60 };
+
+            console.log(`Background: Preparing to create alarm: Name='${alarmName}', ID=${schedule.id}, Time=${schedule.time}, Calculated 'when'=${new Date(alarmInfo.when).toLocaleString()}`);
+
+            try {
+                await chrome.alarms.create(alarmName, alarmInfo);
+                createdCount++;
+                console.log(`Background: Successfully CREATED alarm '${alarmName}' for schedule ID ${schedule.id} to run at ${new Date(alarmInfo.when).toLocaleString()}`);
+            } catch (createError) {
+                console.error(`Background: FAILED to create alarm '${alarmName}'. Error:`, createError.message, createError.stack);
+            }
         }
-        console.log(`Background: Created ${createdCount} new schedule alarms.`);
+        console.log(`Background: Finished processing schedules. Created ${createdCount} new schedule alarms.`);
 
     } catch (error) {
-        console.error('Background: Error during alarm initialization:', error.message, error.stack);
+        console.error('Background: CRITICAL error during alarm initialization process:', error.message, error.stack);
     }
 }
 
 
 // --- Utility Functions ---
 
-function applyScheduledBrightnessToTabs(darkModeState, brightnessLevel) {
-    chrome.tabs.query({}, (tabs) => { // Query all tabs
+function applyScheduledBrightnessToTabs(darkModeState, brightnessLevel, source = "schedule") {
+    console.log(`Background: applyScheduledBrightnessToTabs called by ${source}. DM: ${darkModeState}, Brightness: ${brightnessLevel}. Applying to all relevant tabs.`);
+    chrome.tabs.query({}, (tabs) => {
         if (chrome.runtime.lastError) {
-            console.error("Background: Error querying tabs to apply scheduled brightness:", chrome.runtime.lastError.message);
+            console.error("Background: Error querying tabs for scheduled brightness:", chrome.runtime.lastError.message);
             return;
         }
+        let appliedCount = 0;
         for (const tab of tabs) {
-            if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:') && !tab.url.startsWith('https://chrome.google.com/webstore')) {
+            if (tab.id && tab.url &&
+                !tab.url.startsWith('chrome://') &&
+                !tab.url.startsWith('edge://') &&
+                !tab.url.startsWith('about:') &&
+                !tab.url.startsWith('https://chrome.google.com/webstore')) {
+
                 chrome.tabs.sendMessage(tab.id, {
                     type: 'APPLY_SETTINGS',
-                    darkMode: darkModeState, // Send current dark mode state
+                    darkMode: darkModeState,
                     brightness: brightnessLevel
                 }, response => {
                     if (chrome.runtime.lastError) {
-                        // console.warn(`Background: Could not apply scheduled brightness to tab ${tab.id}:`, chrome.runtime.lastError.message);
+                        // console.warn(`Background: Tab ${tab.id} - Could not apply scheduled settings: ${chrome.runtime.lastError.message}`);
                     } else {
-                        // console.log(`Background: Applied scheduled brightness to tab ${tab.id}. Response:`, response?.status);
+                        // console.log(`Background: Tab ${tab.id} - Applied scheduled settings. Response: ${response?.status}`);
                     }
                 });
+                appliedCount++;
             }
         }
+        console.log(`Background: Sent APPLY_SETTINGS to ${appliedCount} tabs for source '${source}'.`);
     });
 }
 
 
-// --- Tab Update Listener (for manual settings, not scheduled) ---
-// This remains to apply general settings on tab updates.
+// --- Tab Update Listener (for ensuring settings on tab updates) ---
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url &&
         !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') &&
         !tab.url.startsWith('about:') && !tab.url.startsWith('https://chrome.google.com/webstore')) {
 
-        chrome.storage.sync.get(['darkModeEnabled', 'brightnessLevel', 'timeSchedulesEnabled'], (result) => {
+        console.log(`Background: Tab ${tabId} updated: ${tab.url}. Checking settings to apply.`);
+        chrome.storage.sync.get(['darkModeEnabled', 'brightnessLevel', 'timeSchedulesEnabled', 'brightnessSchedules'], (result) => {
             if (chrome.runtime.lastError) {
-                console.error('Background: Error getting settings for tab update:', chrome.runtime.lastError.message);
+                console.error(`Background: Tab ${tabId} - Error getting settings for tab update:`, chrome.runtime.lastError.message);
                 return;
             }
 
-            // If time schedules are enabled, let alarms handle brightness primarily.
-            // This onUpdated logic should only apply general manual settings.
-            // Or, if a scheduled brightness was just missed, it could apply it here too,
-            // but that might get complex. Let's keep it simple: apply manual settings.
-            if (result.timeSchedulesEnabled) {
-                 console.log(`Background: Tab ${tabId} updated. Time schedules are ON. Manual dark mode: ${!!result.darkModeEnabled}. Brightness will be handled by alarms or manual changes.`);
-                 // We could potentially check if the current time *should* have a scheduled brightness
-                 // and apply it if it's very close to a schedule time, but alarms are better.
-                 // For now, just apply the global dark mode state. Brightness from alarms.
-                 // If user manually changed brightness, that will be the 'brightnessLevel'.
-                 applyScheduledBrightnessToTabs(!!result.darkModeEnabled, result.brightnessLevel);
+            const currentDarkMode = !!result.darkModeEnabled;
+            let currentBrightness = result.brightnessLevel === undefined ? 100 : result.brightnessLevel; // Manual/last known brightness
 
+            if (!!result.timeSchedulesEnabled && Array.isArray(result.brightnessSchedules) && result.brightnessSchedules.length > 0) {
+                console.log(`Background: Tab ${tabId} - Time schedules ON. Determining appropriate brightness.`);
+                // Find if any schedule *should* be active now or was the most recent one.
+                // This logic can get complex if we try to perfectly match the "active" schedule.
+                // For simplicity on tab updates, content.js initial load handles applying last *saved* brightness.
+                // Alarms will override it when they fire.
+                // So, for onUpdated, we apply the general brightnessLevel which reflects the last *user action or scheduled update*.
+                console.log(`Background: Tab ${tabId} - Applying last known brightness: ${currentBrightness} with DM: ${currentDarkMode}. Alarms will adjust if a schedule is due.`);
             } else {
-                console.log(`Background: Tab ${tabId} updated. Time schedules OFF. Applying manual settings.`);
-                applyScheduledBrightnessToTabs(!!result.darkModeEnabled, result.brightnessLevel === undefined ? 100 : result.brightnessLevel);
+                console.log(`Background: Tab ${tabId} - Time schedules OFF or no schedules. Applying manual settings: DM=${currentDarkMode}, B=${currentBrightness}`);
             }
+            // Send current dark mode and the last known (manual or scheduled) brightness.
+            // content.js will apply this when it loads. Alarms will override brightness if a schedule hits.
+             chrome.tabs.sendMessage(tabId, {
+                    type: 'APPLY_SETTINGS',
+                    darkMode: currentDarkMode,
+                    brightness: currentBrightness
+                }, response => {
+                    if (chrome.runtime.lastError) {
+                        // console.warn(`Background: Tab ${tabId} - Error sending initial settings on update: ${chrome.runtime.lastError.message}`);
+                    }
+                });
         });
     }
 });
