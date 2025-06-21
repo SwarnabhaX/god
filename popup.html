@@ -5,39 +5,46 @@
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-      width: 280px; /* Slightly wider for better spacing */
-      padding: 18px;
-      background-color: #282c34; /* Dark background */
-      color: #abb2bf; /* Light grey text */
+      width: 280px;
+      padding: 20px; /* Increased padding */
+      background-color: rgba(30, 33, 39, 0.85); /* Dark, semi-transparent background */
+      color: #c8cdd3; /* Softer light grey text */
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 18px; /* Space between control groups */
+      gap: 20px; /* Increased space */
+      border-radius: 12px; /* Curved edges for the popup body */
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* More pronounced shadow for depth */
+      -webkit-backdrop-filter: blur(12px); /* Blur effect for Safari */
+      backdrop-filter: blur(12px); /* Blur effect */
+      border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border to enhance glass effect */
     }
     h3 {
-      margin: 0 0 10px 0;
-      color: #61afef; /* Accent color for heading */
+      margin: 0 0 12px 0;
+      color: #61afef;
       text-align: center;
       font-size: 18px;
       font-weight: 600;
     }
     .control-group {
-      background-color: #353a45; /* Slightly lighter dark for groups */
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      background-color: rgba(44, 48, 56, 0.75); /* Semi-transparent control group background */
+      padding: 18px; /* Increased padding */
+      border-radius: 10px; /* More curved edges for groups */
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2); /* Softer shadow for groups */
+      border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border for groups */
     }
-    label {
+    label { /* General label styling */
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 10px; /* Increased margin */
       font-weight: 500;
       font-size: 14px;
+      color: #c8cdd3;
     }
     .toggle-switch-label { /* Specific class for the Dark Mode label text */
-        color: #abb2bf; /* Ensure it's light */
+        color: #c8cdd3;
     }
 
-    /* Toggle Switch Styles */
+    /* Toggle Switch Styles - largely similar, colors adjusted for new theme */
     .toggle-switch {
       display: flex;
       align-items: center;
@@ -46,7 +53,7 @@
     .switch {
       position: relative;
       display: inline-block;
-      width: 44px; /* Slightly smaller */
+      width: 44px;
       height: 22px;
     }
     .switch input {
@@ -54,100 +61,172 @@
       width: 0;
       height: 0;
     }
-    .slider-round { /* Changed class name for clarity */
+    .slider-round {
       position: absolute;
       cursor: pointer;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #4b5260; /* Darker grey for off state */
+      background-color: rgba(75, 82, 96, 0.7); /* Semi-transparent off state */
       transition: .3s;
       border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     .slider-round:before {
       position: absolute;
       content: "";
       height: 16px;
       width: 16px;
-      left: 3px; /* Adjusted for new size */
-      bottom: 3px; /* Adjusted for new size */
-      background-color: white;
+      left: 3px;
+      bottom: 3px;
+      background-color: #ffffff; /* Solid white knob */
       transition: .3s;
       border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
     input:checked + .slider-round {
-      background-color: #61afef; /* Accent color for on state */
+      background-color: rgba(97, 175, 239, 0.85); /* Semi-transparent accent for on state */
     }
     input:checked + .slider-round:before {
-      transform: translateX(22px); /* Adjusted for new size */
+      transform: translateX(22px);
     }
 
-    /* Range Slider Styles */
+    /* Range Slider Styles - colors adjusted */
     #brightnessValue {
       display: inline-block;
       min-width: 30px;
       text-align: right;
       font-weight: 500;
-      color: #61afef; /* Accent color */
+      color: #61afef;
     }
     input[type="range"] {
       width: 100%;
       cursor: pointer;
-      -webkit-appearance: none; /* Override default appearance */
+      -webkit-appearance: none;
       appearance: none;
-      background: transparent; /* Transparent track */
-      height: 20px; /* Overall height for interaction */
+      background: transparent;
+      height: 20px;
       margin-top: 5px;
     }
 
-    /* Range Slider Track (Chrome/Safari/Edge) */
     input[type="range"]::-webkit-slider-runnable-track {
       width: 100%;
       height: 6px;
-      background: #4b5260; /* Dark track */
+      background: rgba(75, 82, 96, 0.7); /* Semi-transparent dark track */
       border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    /* Range Slider Thumb (Chrome/Safari/Edge) */
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      margin-top: -7px; /* Center thumb on track ( (track_height - thumb_height)/2 + border_width ) */
+      margin-top: -7px;
       width: 20px;
       height: 20px;
-      background: #61afef; /* Accent color thumb */
+      background: #61afef; /* Solid accent color thumb */
       border-radius: 50%;
-      border: 2px solid #282c34; /* Border matches body bg for "floating" look */
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      border: 2px solid rgba(30, 33, 39, 0.85); /* Border matches body bg for "floating" look */
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
     }
 
-    /* Range Slider Track (Firefox) */
     input[type="range"]::-moz-range-track {
       width: 100%;
       height: 6px;
-      background: #4b5260;
+      background: rgba(75, 82, 96, 0.7);
       border-radius: 3px;
-      border: none;
+      border: 1px solid rgba(255, 255, 255, 0.05);
     }
-    /* Range Slider Thumb (Firefox) */
     input[type="range"]::-moz-range-thumb {
-      width: 18px; /* Slightly smaller to match webkit visual */
+      width: 18px;
       height: 18px;
       background: #61afef;
       border-radius: 50%;
-      border: 2px solid #282c34;
+      border: 2px solid rgba(30, 33, 39, 0.85);
       cursor: pointer;
     }
 
-    /* Status message styling (from popup.js) */
     #statusMessage {
         font-size: 12px;
-        padding: 10px;
-        background-color: #4b5260;
-        border-radius: 5px;
+        padding: 12px;
+        background-color: rgba(44, 48, 56, 0.8); /* Semi-transparent */
+        border-radius: 8px;
         margin-top: 10px;
         text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Styles for Time-Based Brightness Section */
+    #schedulesContainer label, #addScheduleForm label {
+      font-size: 13px;
+      color: #a0a8b4; /* Slightly muted label color */
+    }
+
+    #schedulesList li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(30, 33, 39, 0.7); /* Darker item background */
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .delete-schedule-btn {
+      background-color: rgba(207, 78, 78, 0.7); /* Semi-transparent red */
+      color: white;
+      border: none;
+      border-radius: 50%; /* Circular button */
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 20px; /* Center text */
+      text-align: center;
+      transition: background-color 0.2s;
+    }
+    .delete-schedule-btn:hover {
+      background-color: rgba(207, 78, 78, 1); /* Solid red on hover */
+    }
+
+    .form-input {
+      background-color: rgba(75, 82, 96, 0.7);
+      color: #c8cdd3;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: rgba(97, 175, 239, 0.8); /* Accent color border on focus */
+      box-shadow: 0 0 0 2px rgba(97, 175, 239, 0.3);
+    }
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.8); /* Make time picker icon lighter on dark background */
+    }
+
+
+    .button-primary {
+      background-color: rgba(97, 175, 239, 0.85); /* Accent color */
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 15px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      width: 100%; /* Make button full width */
+    }
+    .button-primary:hover {
+      background-color: rgba(97, 175, 239, 1);
+    }
+    #addScheduleForm[disabled] .form-input,
+    #addScheduleForm[disabled] .button-primary,
+    #schedulesContainer[disabled] .delete-schedule-btn {
+        opacity: 0.5;
+        pointer-events: none;
     }
   </style>
 </head>
@@ -167,6 +246,34 @@
   <div class="control-group">
     <label for="brightnessSlider">Brightness: <span id="brightnessValue">100</span>%</label>
     <input type="range" id="brightnessSlider" min="30" max="100" value="100">
+  </div>
+
+  <div class="control-group" id="timeBasedBrightnessSection">
+    <div class="toggle-switch">
+      <label for="timeBasedBrightnessToggle" class="toggle-switch-label">Time-Based Brightness</label>
+      <label class="switch">
+        <input type="checkbox" id="timeBasedBrightnessToggle">
+        <span class="slider-round"></span>
+      </label>
+    </div>
+
+    <div id="schedulesContainer" style="margin-top: 15px;">
+      <label style="margin-bottom: 5px;">Schedules:</label>
+      <ul id="schedulesList" style="list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto;">
+        <!-- Schedules will be populated here by popup.js -->
+        <!-- Example: <li>22:00 - 70% <button class="delete-schedule-btn">X</button></li> -->
+      </ul>
+    </div>
+
+    <div id="addScheduleForm" style="margin-top: 15px;">
+      <label for="scheduleTime" style="margin-bottom: 5px;">New Schedule:</label>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom:10px;">
+        <input type="time" id="scheduleTime" class="form-input" style="flex-grow: 1;">
+        <input type="number" id="scheduleBrightness" min="30" max="100" value="70" class="form-input" style="width: 60px; text-align: center;">
+        <span style="font-size:12px;">%</span>
+      </div>
+      <button id="addScheduleButton" class="button-primary">Add</button>
+    </div>
   </div>
 
   <script src="popup.js"></script>
